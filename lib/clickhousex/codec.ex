@@ -8,7 +8,7 @@ defmodule Clickhousex.Codec do
   [1]: https://clickhouse.tech/docs/en/interfaces/formats/
   """
 
-  @type select_response :: %{column_names: [String.t()], rows: [tuple], row_count: non_neg_integer}
+  @type select_response :: %{column_names: [String.t()], rows: [list], row_count: non_neg_integer}
   @type state :: any
 
   @callback response_format() :: String.t()

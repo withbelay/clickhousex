@@ -173,7 +173,7 @@ defmodule Clickhousex.Codec.RowBinary do
   end
 
   defp extract_row(<<data::binary>>, [], row_data, state(rows: rows, count: count) = state) do
-    row = row_data |> Enum.reverse() |> List.to_tuple()
+    row = row_data |> Enum.reverse()
     new_state = state(state, rows: [row | rows], count: count + 1)
     extract_rows(data, new_state)
   end

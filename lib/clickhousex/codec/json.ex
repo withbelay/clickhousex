@@ -46,7 +46,6 @@ defmodule Clickhousex.Codec.JSON do
             for {raw_value, column_type} <- Enum.zip(row, column_types) do
               to_native(column_type, raw_value)
             end
-            |> List.to_tuple()
           end
 
         {:ok, %{column_names: column_names, rows: rows, count: row_count}}
