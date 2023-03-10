@@ -6,11 +6,14 @@ defmodule Clickhousex.Protocol do
   alias Clickhousex.Error
   alias Clickhousex.HTTPClient, as: Client
 
-  defstruct conn_opts: [], base_address: "", conn: nil
+  defstruct conn_opts: [], conn: nil
+
+  defmodule CursorsNotSupportedError do
+    defexception message: "cursors not supported"
+  end
 
   @type state :: %__MODULE__{
           conn_opts: Keyword.t(),
-          base_address: String.t(),
           conn: Mint.HTTP.t()
         }
 
@@ -22,7 +25,7 @@ defmodule Clickhousex.Protocol do
   @ping_params DBConnection.Query.encode(@ping_query, [], [])
 
   @doc false
-  @spec connect(opts :: Keyword.t()) :: {:ok, state} | {:error, Exception.t()}
+  @spec connect(keyword) :: {:ok, state} | {:error, Exception.t()}
   def connect(opts) do
     scheme = opts[:scheme] || :http
     hostname = opts[:hostname] || "localhost"
@@ -32,11 +35,9 @@ defmodule Clickhousex.Protocol do
     password = opts[:password]
     timeout = opts[:timeout] || Clickhousex.timeout()
 
-    {:ok, conn} = Client.connect(scheme, hostname, port)
-
-    response = Client.request(conn, @ping_query, @ping_params, timeout, username, password, database)
-
-    with {:ok, conn, {:selected, _, _}} <- response do
+    with {:ok, conn} <- Client.connect(scheme, hostname, port),
+         {:ok, conn, {:selected, _, _}} <-
+           Client.request(conn, @ping_query, @ping_params, timeout, username, password, database) do
       conn_opts = [
         scheme: scheme,
         hostname: hostname,
@@ -57,15 +58,13 @@ defmodule Clickhousex.Protocol do
   end
 
   @doc false
-  @spec disconnect(err :: Exception.t(), state) :: :ok
+  @spec disconnect(err :: binary | Exception.t(), state) :: :ok
   def disconnect(_err, _state) do
     :ok
   end
 
   @doc false
-  @spec ping(state) ::
-          {:ok, state}
-          | {:disconnect, term, state}
+  @spec ping(state) :: {:ok, state} | {:disconnect, Exception.t(), state}
   def ping(state) do
     case do_query(state.conn, @ping_query, @ping_params, [], state) do
       {:ok, _, _, new_state} -> {:ok, new_state}
@@ -75,10 +74,11 @@ defmodule Clickhousex.Protocol do
   end
 
   @doc false
-  @spec reconnect(new_opts :: Keyword.t(), state) :: {:ok, state}
+  @spec reconnect(keyword, state) :: {:ok, state}
   def reconnect(new_opts, state) do
-    with :ok <- disconnect("Reconnecting", state),
-         do: connect(new_opts)
+    with :ok <- disconnect("Reconnecting", state) do
+      connect(new_opts)
+    end
   end
 
   @doc false
@@ -99,35 +99,39 @@ defmodule Clickhousex.Protocol do
   end
 
   @doc false
-  @spec handle_prepare(query, Keyword.t(), state) :: {:ok, query, state}
+  @spec handle_prepare(query, keyword, state) :: {:ok, query, state}
   def handle_prepare(query, _, state) do
     {:ok, query, state}
   end
 
   @doc false
-  @spec handle_execute(query, list, opts :: Keyword.t(), state) ::
-          {:ok, result, state}
-          | {:error | :disconnect, Exception.t(), state}
+  @spec handle_execute(query, map, keyword, state) :: {:ok, query, result, state} | {:error | :disconnect, Exception.t(), state}
   def handle_execute(query, params, opts, state) do
     do_query(state.conn, query, params, opts, state)
   end
 
   @doc false
   def handle_declare(_query, _params, _opts, state) do
-    {:error, :cursors_not_supported, state}
+    raise CursorsNotSupportedError
+  rescue
+    err in CursorsNotSupportedError -> {:error, err, state}
   end
 
   @doc false
   def handle_deallocate(_query, _cursor, _opts, state) do
-    {:error, :cursors_not_supported, state}
+    raise CursorsNotSupportedError
+  rescue
+    err in CursorsNotSupportedError -> {:error, err, state}
   end
 
   def handle_fetch(_query, _cursor, _opts, state) do
-    {:error, :cursors_not_supported, state}
+    raise CursorsNotSupportedError
+  rescue
+    err in CursorsNotSupportedError -> {:error, err, state}
   end
 
   @doc false
-  @spec handle_begin(opts :: Keyword.t(), state) :: {:ok, result, state}
+  @spec handle_begin(keyword, state) :: {:ok, result, state}
   def handle_begin(_opts, state) do
     {:ok, %Clickhousex.Result{}, state}
   end
@@ -139,19 +143,19 @@ defmodule Clickhousex.Protocol do
   end
 
   @doc false
-  @spec handle_commit(opts :: Keyword.t(), state) :: {:ok, result, state}
+  @spec handle_commit(keyword, state) :: {:ok, result, state}
   def handle_commit(_opts, state) do
     {:ok, %Clickhousex.Result{}, state}
   end
 
   @doc false
-  @spec handle_info(opts :: Keyword.t(), state) :: {:ok, result, state}
+  @spec handle_info(keyword, state) :: {:ok, state}
   def handle_info(_msg, state) do
     {:ok, state}
   end
 
   @doc false
-  @spec handle_rollback(opts :: Keyword.t(), state) :: {:ok, result, state}
+  @spec handle_rollback(keyword, state) :: {:ok, result, state}
   def handle_rollback(_opts, state) do
     {:ok, %Clickhousex.Result{}, state}
   end
@@ -174,12 +178,12 @@ defmodule Clickhousex.Protocol do
       {:error, conn, reason} ->
         {:error, reason, %{state | conn: conn}}
 
-      {:ok, conn, {:selected, columns, rows}} ->
+      {:ok, conn, {command, columns, rows}} ->
         {
           :ok,
           query,
           %Clickhousex.Result{
-            command: :selected,
+            command: command,
             columns: columns,
             rows: rows,
             num_rows: Enum.count(rows)
@@ -196,19 +200,6 @@ defmodule Clickhousex.Protocol do
             columns: ["count"],
             rows: [[count]],
             num_rows: 1
-          },
-          %{state | conn: conn}
-        }
-
-      {:ok, conn, {command, columns, rows}} ->
-        {
-          :ok,
-          query,
-          %Clickhousex.Result{
-            command: command,
-            columns: columns,
-            rows: rows,
-            num_rows: Enum.count(rows)
           },
           %{state | conn: conn}
         }

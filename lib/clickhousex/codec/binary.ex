@@ -1,7 +1,7 @@
 defmodule Clickhousex.Codec.Binary do
   @moduledoc false
 
-  use Bitwise
+  import Bitwise
 
   def encode(:varint, num) when num < 128, do: <<num>>
   def encode(:varint, num), do: <<1::1, num::7, encode(:varint, num >>> 7)::binary>>
@@ -225,7 +225,7 @@ defmodule Clickhousex.Codec.Binary do
       {:ok, decoded, rest} ->
         decode_struct(rest, specs, Map.put(struct, field_name, decoded))
 
-      {:error, _} = err ->
+      err ->
         err
     end
   end

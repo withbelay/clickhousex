@@ -93,7 +93,7 @@ defmodule Clickhousex.Codec.BinaryTest do
   test "decoding a nullable string" do
     null = encode({:nullable, :string}, nil) |> IO.iodata_to_binary()
     assert {:resume, resumer} = decode(<<>>, {:nullable, :string})
-    assert {:ok, long_string, <<>>} = resumer.(null)
+    assert {:ok, _long_string, <<>>} = resumer.(null)
 
     long_string = String.duplicate("h", 300)
     non_null = encode({:nullable, :string}, long_string) |> IO.iodata_to_binary()

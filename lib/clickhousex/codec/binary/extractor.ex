@@ -52,7 +52,7 @@ defmodule Clickhousex.Codec.Binary.Extractor do
 
   defmacro __using__(_) do
     quote do
-      use Bitwise
+      import Bitwise
       Module.register_attribute(__MODULE__, :extract, accumulate: true)
       Module.register_attribute(__MODULE__, :extractors, accumulate: true)
       @on_definition {unquote(__MODULE__), :on_definition}

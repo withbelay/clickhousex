@@ -4,7 +4,7 @@ defmodule Clickhousex.HTTPClient do
 
     defstruct ref: nil, codec_state: nil, status: nil, error_buffer: [], complete?: false
 
-    @codec Application.get_env(:clickhousex, :codec, Clickhousex.Codec.JSON)
+    @codec Application.compile_env(:clickhousex, :codec, Clickhousex.Codec.JSON)
     def new(ref) do
       codec_state = @codec.new()
 
@@ -92,6 +92,9 @@ defmodule Clickhousex.HTTPClient do
            receive_response(conn, recv_timeout, Response.new(ref)) do
       decode_response(conn, query, response)
     else
+      {:error, conn, error} ->
+        {:error, conn, error}
+
       {:error, conn, error, _messages} ->
         {:error, conn, error}
     end
@@ -100,7 +103,7 @@ defmodule Clickhousex.HTTPClient do
   defp decode_response(conn, %Query{type: :select}, %Response{} = response) do
     case Response.decode(response) do
       {:ok, %{column_names: columns, rows: rows}} -> {:ok, conn, {:selected, columns, rows}}
-      {:error, error} -> {:error, conn, error.reason}
+      {:error, error} -> {:error, conn, error}
     end
   end
 

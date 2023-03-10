@@ -117,7 +117,7 @@ defmodule Clickhousex.QueryTest do
                ]
              )
 
-    assert {:ok, _, %Result{columns: column_names, rows: [row]}} = select_all(ctx)
+    assert {:ok, _, %Result{columns: _column_names, rows: [row]}} = select_all(ctx)
 
     naive_datetime =
       datetime
