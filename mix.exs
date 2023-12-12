@@ -29,7 +29,7 @@ defmodule Clickhousex.Mixfile do
     [
       {:db_connection, "~> 2.0"},
       {:mint, "~> 1.0"},
-      {:castore, "~> 0.1"},
+      {:castore, "~> 0.1 or ~> 1.0"},
       {:jason, "~> 1.0"},
       {:ex_doc, "~> 0.22", only: :dev},
       {:benchee, "~> 1.0", only: [:dev, :test]},
